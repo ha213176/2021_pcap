@@ -13,7 +13,7 @@ tcp_hdr *tcp = NULL;
 udp_hdr *udp = NULL;
 
 int main(int argc, char **argv){
-    if(argc != 2){
+    if(argc > 3 || argc < 2){
         printf("Error argument: ./pcap_hw3 [file].pcap\n");
         exit(1);
     }
@@ -27,8 +27,23 @@ int main(int argc, char **argv){
         fprintf(stderr,"pcap_open_offline(): %s\n", errbuf);
         exit(1);
     }
-    
+
     printf("Open: %s\n", fname);
+
+    struct bpf_program fcode;
+    const char *filter = "";
+    if(argc == 3){
+        filter = argv[2];
+        if(-1 == pcap_compile(handle, &fcode, filter, 1, PCAP_NETMASK_UNKNOWN)){
+            fprintf(stderr, "pcap_comple: error\n");
+            pcap_close(handle);
+            exit(1);
+        }
+
+        if(strlen(filter) != 0){
+            printf("Filter: %s\n", filter);
+        }
+    }
 
     const u_char *packet = NULL;
     struct pcap_pkthdr header;
@@ -42,6 +57,12 @@ int main(int argc, char **argv){
     while(1){
         packet = pcap_next(handle, &header);
         if(packet == NULL) break;
+        
+        // filter
+        if(argc == 3 && 0 == pcap_offline_filter(&fcode, &header, packet)){
+            continue;
+        }
+        
         // time
         t = header.ts.tv_sec;
         timeinfo = localtime(&t);
